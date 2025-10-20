@@ -1,0 +1,88 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": [
+          {
+            "item": "1",
+            "hour": 8
+          }
+        ]
+      },
+      "id": "1",
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [200, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/top-headlines?country=us&apiKey=YOUR_NEWS_API_KEY",
+        "responseFormat": "json"
+      },
+      "id": "2",
+      "name": "Fetch News",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [400, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "const { ChatOpenAI } = require('langchain/chat_models/openai');\nconst { HumanMessage } = require('langchain/schema');\n\nasync function summarize(news) {\n  const llm = new ChatOpenAI({\n    temperature: 0.3,\n    modelName: \"gpt-4o-mini\",\n    openAIApiKey: process.env.OPENAI_API_KEY\n  });\n  const headlines = news.articles.map(a => `Title: ${a.title}\\nDescription: ${a.description}`).join('\\n');\n  const res = await llm.call([new HumanMessage(`Summarize these headlines into bullet points:\n${headlines}`)]);\n  return res.content;\n}\n\nreturn summarize(items[0].json).then(summary => {\n  return [{ json: { date: new Date().toISOString(), summary } }];\n});"
+      },
+      "id": "3",
+      "name": "Summarize with LangChain",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [600, 200]
+    },
+    {
+      "parameters": {
+        "responseMode": "lastNode",
+        "options": {
+          "responseContentType": "application/json"
+        }
+      },
+      "id": "4",
+      "name": "Public API Endpoint",
+      "type": "n8n-nodes-base.httpResponse",
+      "typeVersion": 1,
+      "position": [800, 200]
+    }
+  ],
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch News": {
+      "main": [
+        [
+          {
+            "node": "Summarize with LangChain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize with LangChain": {
+      "main": [
+        [
+          {
+            "node": "Public API Endpoint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
